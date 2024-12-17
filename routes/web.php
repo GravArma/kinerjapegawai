@@ -31,7 +31,7 @@ Route::controller(AdminController::class)->group(function () {
     Route::post('admin/pegawaieditsimpan/{id}', 'pegawaieditsimpan');
     Route::get('admin/pegawaihapus/{id}', 'pegawaihapus');
 
-    
+
     Route::get('admin/laporandaftar', 'laporandaftar');
     Route::post('admin/laporancetak', 'laporancetak');
 
@@ -41,10 +41,9 @@ Route::controller(AdminController::class)->group(function () {
     Route::get('admin/penilaianedit/{id}', 'penilaianedit');
     Route::post('admin/penilaianeditsimpan/{id}', 'penilaianeditsimpan');
     Route::get('admin/penilaianhapus/{id}', 'penilaianhapus');
-
     Route::get('admin/prediksi', 'prediksi');
-
-
+    Route::get('admin/trainAndSaveModel', 'trainAndSaveModel');
+    Route::get('admin/predictKinerja/{id}', 'predictKinerja');
 });
 
 Route::controller(HomeController::class)->group(function () {

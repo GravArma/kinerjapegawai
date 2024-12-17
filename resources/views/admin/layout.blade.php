@@ -96,11 +96,16 @@
                         </a>
                     </li>
                     <li>
+                        <a href="{{ url('admin/trainAndSaveModel') }}" class="dropdown-toggle no-arrow">
+                            <span class="micon dw dw-invoice"></span><span class="mtext">Model</span>
+                        </a>
+                    </li>
+                    <li>
                         <a href="{{ url('admin/prediksi') }}" class="dropdown-toggle no-arrow">
                             <span class="micon dw dw-invoice"></span><span class="mtext">Prediksi</span>
                         </a>
                     </li>
-                
+
 
                 </ul>
             </div>

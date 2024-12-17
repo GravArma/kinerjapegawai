@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\RandomForest;
+// use App\RandomForest;
+use Phpml\Classification\Ensemble\RandomForest;
 use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\Session\Session;
+use Phpml\ModelManager;
 
 class AdminController extends Controller
 {
@@ -257,5 +259,154 @@ class AdminController extends Controller
             }
         }
         return $correct / count($actual) * 100; // Return accuracy as a percentage
+    }
+    public function trainAndSaveModel()
+    {
+        // Ambil data dari tabel penilaian_kinerja
+        $data = DB::table('penilaian_kinerja')->get();
+
+        if ($data->isEmpty()) {
+            return redirect()->back()->with('error', 'Data penilaian kosong. Tidak bisa melatih model.');
+        }
+
+        // Siapkan fitur (X) dan label (y)
+        $samples = [];
+        $labels = [];
+        foreach ($data as $item) {
+            $samples[] = [
+                $item->kompetensi_teknis,
+                $item->kompetensi_soft_skill,
+                $item->kehadiran,
+                $item->produktivitas,
+                $item->inisiatif_kreativitas,
+            ];
+            $labels[] = $item->tingkat_mutu_karyawan;
+        }
+
+        // Latih model Random Forest dengan parameter yang sesuai
+        $classifier = new RandomForest(
+            2,   // $numTrees: Jumlah pohon dalam hutan
+            1,  // $maxDepth: Tidak membatasi kedalaman pohon
+            2,     // $minSamplesSplit: Minimal sampel untuk split
+            1   // $maxFeatures: Gunakan semua fitur
+        );
+
+        $classifier->train($samples, $labels);
+
+        // Serialisasi model menjadi string menggunakan ModelManager
+        $modelManager = new ModelManager();
+
+        // Menyimpan model ke dalam memori dengan path sementara
+        $path = storage_path('app/models/' . uniqid('model_') . '.mdl');
+        $modelManager->saveToFile($classifier, $path);
+
+        // Membaca model dari file dan mengencode-nya ke base64
+        $modelData = base64_encode(file_get_contents($path));
+
+        // Simpan model ke tabel random_forest_models
+        DB::table('random_forest_models')->insert([
+            'model_name' => 'Penilaian Kinerja Model',
+            'model_data' => $modelData,
+            'created_at' => now(),
+        ]);
+
+        // Hapus file model sementara setelah disimpan di database
+        unlink($path);
+
+        // Ambil data model terbaru untuk ditampilkan di view
+        $models = DB::table('random_forest_models')->orderBy('created_at', 'desc')->get();
+
+        // Kirim data ke view
+        $data = [
+            'title' => 'Daftar Penilaian Kinerja',
+            'models' => $models,
+        ];
+
+        // Tampilkan view dengan data model
+        return view('admin.train', $data)->with('success', 'Model berhasil dilatih dan disimpan ke database.');
+    }
+
+    public function predictKinerja($idpegawai)
+    {
+        // Ambil data penilaian kinerja berdasarkan idpegawai
+        $penilaian = DB::table('penilaian_kinerja')
+            ->where('idpegawai', $idpegawai)
+            ->first();
+
+        if (!$penilaian) {
+            return redirect()->back()->with('error', 'Data penilaian tidak ditemukan.');
+        }
+
+        // Siapkan data untuk prediksi
+        $sample = [
+            $penilaian->kompetensi_teknis,
+            $penilaian->kompetensi_soft_skill,
+            $penilaian->kehadiran,
+            $penilaian->produktivitas,
+            $penilaian->inisiatif_kreativitas,
+        ];
+
+        // Validasi data sample
+        foreach ($sample as $value) {
+            if (is_null($value) || !is_numeric($value)) {
+                return redirect()->back()->with('error', 'Data penilaian tidak valid.');
+            }
+        }
+
+        // Muat model dari database
+        $modelRow = DB::table('random_forest_models')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$modelRow) {
+            return redirect()->back()->with('error', 'Model belum dilatih.');
+        }
+
+        // Decode base64 model data
+        $modelData = base64_decode($modelRow->model_data);
+        $modelManager = new ModelManager();
+
+        // Simpan sementara file model untuk pemuatan
+        $tempPath = storage_path('app/models/' . uniqid('model_') . '.mdl');
+        file_put_contents($tempPath, $modelData);
+
+        // Periksa apakah file model berhasil disimpan
+        if (!file_exists($tempPath)) {
+            return redirect()->back()->with('error', 'File model tidak ditemukan.');
+        }
+
+        // Muat model dari file sementara
+        try {
+            $classifier = $modelManager->restoreFromFile($tempPath);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Model tidak dapat dimuat dengan benar.');
+        }
+
+        // Hapus file model sementara setelah digunakan
+        unlink($tempPath);
+
+        // Prediksi tingkat mutu karyawan
+        try {
+            $prediction = $classifier->predict($sample);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Prediksi gagal dilakukan.');
+        }
+
+        // Periksa hasil prediksi
+        if (is_null($prediction)) {
+            return redirect()->back()->with('error', 'Hasil prediksi tidak valid.');
+        }
+        // print_r($sample);
+        // die();
+        // Simpan hasil prediksi ke tabel penilaian_kinerja
+        $updateResult = DB::table('penilaian_kinerja')
+            ->where('idpegawai', $idpegawai)
+            ->update(['tingkat_mutu_karyawan' => 'jembut']);
+
+        if ($updateResult) {
+            return redirect('admin/pegawaidaftar')->with('success', 'Prediksi berhasil dilakukan. Tingkat mutu karyawan: ' . $prediction);
+        } else {
+            return redirect()->back()->with('error', 'Gagal menyimpan prediksi tingkat mutu karyawan.');
+        }
     }
 }
