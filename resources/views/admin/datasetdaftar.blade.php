@@ -7,47 +7,48 @@
                     <div class="row">
                         <div class="col-md-6 col-sm-12">
                             <div class="title">
-                                <h4>Daftar Pegawai</h4>
+                                <h4>Daftar dataset</h4>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="card-box mb-30">
                     <div class="pd-20">
-                        <h4 class="text-blue h4">Daftar Pegawai</h4>
-                        <a href="{{ url('admin/pegawaitambah/') }}" class="btn btn-success m-1">Tambah</a>
+                        <h4 class="text-blue h4">Daftar dataset</h4>
+                        <a href="{{ url('admin/datasettambah/') }}" class="btn btn-success m-1">Tambah</a>
 
                     </div>
                     <div class="pb-20">
                         <div class="table-responsive">
-                            <table class="table" id="table">
+                            <table class="table" id="daftarproduk">
                                 <thead>
                                     <tr>
                                         <th>No</th>
-                                        <th>NIP</th>
-                                        <th>Nama</th>
-                                        <th>Jabatan</th>
-                                        <th>Alamat</th>
-                                        <th>Email</th>
-                                        <th>No HP</th>
+                                        <th>Nama Pegawai</th>
+                                        <th>Kompetensi Teknis</th>
+                                        <th>Kompetensi Soft Skill</th>
+                                        <th>Kehadiran</th>
+                                        <th>Produktivitas</th>
+                                        <th>Inisiatif Kreativitas</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php $nomor = 1; ?>
-                                    @foreach ($pegawai as $row)
+
+                                    @foreach ($dataset as $item)
                                         <tr>
                                             <td>{{ $nomor++ }}</td>
-                                            <td>{{ $row->nip }}</td>
-                                            <td>{{ $row->nama }}</td>
-                                            <td>{{ $row->jabatan }}</td>
-                                            <td>{{ $row->alamat }}</td>
-                                            <td>{{ $row->email }}</td>
-                                            <td>{{ $row->nohp }}</td>
-                                            <td>
-                                                <a href="{{ url('admin/pegawaiedit/' . $row->idpegawai) }}"
+                                            <td>{{ $item->namapegawai }}</td>
+                                            <td>{{ $item->kompetensi_teknis }}</td>
+                                            <td>{{ $item->kompetensi_soft_skill }}</td>
+                                            <td>{{ $item->kehadiran }}</td>
+                                            <td>{{ $item->produktivitas }}</td>
+                                            <td>{{ $item->inisiatif_kreativitas }}</td>
+                                            <td> 
+                                                <a href="{{ url('admin/datasetedit/' . $item->id) }}"
                                                     class="btn btn-success m-1">Edit</a>
-                                                <a href="{{ url('admin/pegawaihapus/' . $row->idpegawai) }}"
+                                                <a href="{{ url('admin/datasethapus/' . $item->id) }}"
                                                     class="btn btn-danger m-1"
                                                     onclick="return confirm('Yakin Mau di Hapus?')">Hapus</a>
                                             </td>
@@ -62,4 +63,3 @@
         </div>
     </div>
 @endsection
-

@@ -7,15 +7,15 @@
                     <div class="row">
                         <div class="col-md-6 col-sm-12">
                             <div class="title">
-                                <h4>Daftar Pegawai</h4>
+                                <h4>Daftar kriteria</h4>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="card-box mb-30">
                     <div class="pd-20">
-                        <h4 class="text-blue h4">Daftar Pegawai</h4>
-                        <a href="{{ url('admin/pegawaitambah/') }}" class="btn btn-success m-1">Tambah</a>
+                        <h4 class="text-blue h4">Daftar kriteria</h4>
+                        <a href="{{ url('admin/kriteriatambah/') }}" class="btn btn-success m-1">Tambah</a>
 
                     </div>
                     <div class="pb-20">
@@ -24,30 +24,24 @@
                                 <thead>
                                     <tr>
                                         <th>No</th>
-                                        <th>NIP</th>
-                                        <th>Nama</th>
-                                        <th>Jabatan</th>
-                                        <th>Alamat</th>
-                                        <th>Email</th>
-                                        <th>No HP</th>
+                                        <th>Kode</th>
+                                        <th>Nama Kriteria</th>
+                                        <th>Atribut</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php $nomor = 1; ?>
-                                    @foreach ($pegawai as $row)
+                                    @foreach ($kriteria as $row)
                                         <tr>
                                             <td>{{ $nomor++ }}</td>
-                                            <td>{{ $row->nip }}</td>
-                                            <td>{{ $row->nama }}</td>
-                                            <td>{{ $row->jabatan }}</td>
-                                            <td>{{ $row->alamat }}</td>
-                                            <td>{{ $row->email }}</td>
-                                            <td>{{ $row->nohp }}</td>
+                                            <td><?= $row->kode_kriteria ?></td>
+                                            <td><?= $row->nama_kriteria ?></td>
+                                            <td><?= $row->atribut ?></td>
                                             <td>
-                                                <a href="{{ url('admin/pegawaiedit/' . $row->idpegawai) }}"
+                                                <a href="{{ url('admin/kriteriaedit/' . $row->kode_kriteria) }}"
                                                     class="btn btn-success m-1">Edit</a>
-                                                <a href="{{ url('admin/pegawaihapus/' . $row->idpegawai) }}"
+                                                <a href="{{ url('admin/kriteriahapus/' . $row->kode_kriteria) }}"
                                                     class="btn btn-danger m-1"
                                                     onclick="return confirm('Yakin Mau di Hapus?')">Hapus</a>
                                             </td>
@@ -62,4 +56,3 @@
         </div>
     </div>
 @endsection
-

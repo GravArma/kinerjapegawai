@@ -31,7 +31,21 @@ Route::controller(AdminController::class)->group(function () {
     Route::post('admin/pegawaieditsimpan/{id}', 'pegawaieditsimpan');
     Route::get('admin/pegawaihapus/{id}', 'pegawaihapus');
 
+    Route::get('admin/kriteriadaftar', 'kriteriadaftar');
+    Route::get('admin/kriteriatambah', 'kriteriatambah');
+    Route::post('admin/kriteriatambahsimpan', 'kriteriatambahsimpan');
+    Route::get('admin/kriteriaedit/{id}', 'kriteriaedit');
+    Route::post('admin/kriteriaeditsimpan/{id}', 'kriteriaeditsimpan');
+    Route::get('admin/kriteriahapus/{id}', 'kriteriahapus');
+    
+    Route::get('admin/kriteriabobot', 'kriteriabobot');
+    Route::post('admin/updateKriteriaNilai', 'updateKriteriaNilai');
+    
+    Route::get('admin/alternatifbobot', 'alternatifbobot');
+    Route::get('admin/alternatifbobotedit/{id}', 'alternatifbobotedit');
+    Route::post('admin/alternatifboboteditsimpan/{id}', 'alternatifboboteditsimpan');
 
+    Route::get('admin/perhitungan', 'perhitungan');
     Route::get('admin/laporandaftar', 'laporandaftar');
     Route::post('admin/laporancetak', 'laporancetak');
 
@@ -41,9 +55,18 @@ Route::controller(AdminController::class)->group(function () {
     Route::get('admin/penilaianedit/{id}', 'penilaianedit');
     Route::post('admin/penilaianeditsimpan/{id}', 'penilaianeditsimpan');
     Route::get('admin/penilaianhapus/{id}', 'penilaianhapus');
-    Route::get('admin/prediksi', 'prediksi');
-    Route::get('admin/trainAndSaveModel', 'trainAndSaveModel');
-    Route::get('admin/predictKinerja/{id}', 'predictKinerja');
+
+    Route::get('admin/datasetdaftar', 'datasetdaftar');
+    Route::get('admin/datasettambah', 'datasettambah');
+    Route::post('admin/datasettambahsimpan', 'datasettambahsimpan');
+    Route::get('admin/datasetedit/{id}', 'datasetedit');
+    Route::post('admin/dataseteditsimpan/{id}', 'dataseteditsimpan');
+    Route::get('admin/datasethapus/{id}', 'datasethapus');
+
+
+    Route::get('admin/prediksi_kinerja', 'prediksi_kinerja');
+
+
 });
 
 Route::controller(HomeController::class)->group(function () {

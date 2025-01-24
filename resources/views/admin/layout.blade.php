@@ -91,22 +91,25 @@
                         </a>
                     </li>
                     <li>
-                        <a href="{{ url('admin/penilaiandaftar') }}" class="dropdown-toggle no-arrow">
-                            <span class="micon dw dw-invoice"></span><span class="mtext">Data Penilaian</span>
+                        <a href="{{ url('admin/kriteriadaftar') }}" class="dropdown-toggle no-arrow">
+                            <span class="micon dw dw-invoice"></span><span class="mtext">Data Kriteria</span>
                         </a>
                     </li>
                     <li>
-                        <a href="{{ url('admin/trainAndSaveModel') }}" class="dropdown-toggle no-arrow">
-                            <span class="micon dw dw-invoice"></span><span class="mtext">Model</span>
+                        <a href="{{ url('admin/kriteriabobot') }}" class="dropdown-toggle no-arrow">
+                            <span class="micon dw dw-invoice"></span><span class="mtext">Nilai Bobot Kriteria</span>
                         </a>
                     </li>
                     <li>
-                        <a href="{{ url('admin/prediksi') }}" class="dropdown-toggle no-arrow">
-                            <span class="micon dw dw-invoice"></span><span class="mtext">Prediksi</span>
+                        <a href="{{ url('admin/alternatifbobot') }}" class="dropdown-toggle no-arrow">
+                            <span class="micon dw dw-invoice"></span><span class="mtext">Nilai Bobot Alternatif</span>
                         </a>
                     </li>
-
-
+                    <li>
+                        <a href="{{ url('admin/perhitungan') }}" class="dropdown-toggle no-arrow">
+                            <span class="micon dw dw-invoice"></span><span class="mtext">Perhitungan</span>
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -168,7 +171,7 @@
                 //     'colvis'
                 // ],
             });
-        
+
         });
     </script>
 

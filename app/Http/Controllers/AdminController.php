@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers;
 
-// use App\RandomForest;
-use Phpml\Classification\Ensemble\RandomForest;
 use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\Session\Session;
-use Phpml\ModelManager;
+use Phpml\Classification\RandomForest;
+use Phpml\Preprocessing\LabelEncoder;
 
 class AdminController extends Controller
 {
@@ -55,6 +54,15 @@ class AdminController extends Controller
         $email = $request->input('email');
         $nohp = $request->input('nohp');
 
+        // Mengecek apakah NIP sudah ada di database
+        $existingNip = DB::table('pegawai')->where('nip', $nip)->first();
+
+        if ($existingNip) {
+            // Jika NIP sudah ada, tampilkan pesan kesalahan
+            session()->flash('error', 'NIP sudah terdaftar!');
+            return redirect()->back()->withInput();
+        }
+
         // Menyimpan data ke dalam array untuk di-insert ke database
         $simpan = [
             'nip' => $nip,
@@ -73,6 +81,7 @@ class AdminController extends Controller
         return redirect('admin/pegawaidaftar');
     }
 
+
     public function pegawaiedit($id)
     {
         $pegawai = DB::table('pegawai')->where('idpegawai', $id)->first();
@@ -82,8 +91,6 @@ class AdminController extends Controller
         ];
         return view('admin.pegawaiedit', $data);
     }
-
-
 
     public function pegawaieditsimpan(Request $request, $id)
     {
@@ -118,295 +125,376 @@ class AdminController extends Controller
         return redirect('admin/pegawaidaftar');
     }
 
-    public function penilaiandaftar()
+    public function kriteriadaftar()
     {
-        $penilaian = DB::table('penilaian_kinerja')
-            ->join('pegawai', 'penilaian_kinerja.idpegawai', '=', 'pegawai.idpegawai')
+        $kriteria = DB::table('kriteria')->get();
+        $data = [
+            'title' => 'Daftar kriteria',
+            'kriteria' => $kriteria,
+        ];
+        return view('admin.kriteriadaftar', $data);
+    }
+
+
+    public function kriteriatambah()
+    {
+        $data = [
+            'title' => 'Tambah kriteria',
+        ];
+        return view('admin.kriteriatambah', $data);
+    }
+    public function kriteriatambahsimpan(Request $request)
+    {
+        // Mengambil input dari form
+        $kode = $request->input('kode');
+        $nama = $request->input('nama');
+        $atribut = $request->input('atribut');
+
+        // Memeriksa apakah kode kriteria sudah ada untuk periode yang sama
+        $exists = DB::table('kriteria')
+            ->where('kode_kriteria', $kode)
+            ->exists();
+
+        if ($exists) {
+            // Menampilkan pesan kesalahan jika kode kriteria sudah ada
+            session()->flash('error', 'Kode kriteria sudah ada untuk periode ini!');
+            return redirect('admin/kriteriadaftar');
+        } else {
+            $simpan = [
+                'kode_kriteria' => $kode,
+                'nama_kriteria' => $nama,
+                'atribut' => $atribut,
+            ];
+
+            // Menyimpan data ke tabel 'kriteria'
+            DB::table('kriteria')->insert($simpan);
+
+            // Menambahkan relasi kriteria
+            DB::table('rel_kriteria')->insertUsing(
+                ['ID1', 'ID2', 'nilai'],
+                DB::table('kriteria')
+                    ->selectRaw("'$kode', kode_kriteria, 1")
+            );
+
+            DB::table('rel_kriteria')->insertUsing(
+                ['ID1', 'ID2', 'nilai'],
+                DB::table('kriteria')
+                    ->selectRaw("kode_kriteria, '$kode', 1")
+                    ->where('kode_kriteria', '<>', $kode)
+            );
+
+            // Menambahkan relasi alternatif
+            DB::table('rel_alternatif')->insertUsing(
+                ['kode_alternatif', 'kode_kriteria', 'nilai'],
+                DB::table('pegawai')
+                    ->selectRaw("nip, '$kode', 0")
+            );
+
+            // Menampilkan pesan sukses dan mengarahkan kembali ke halaman daftar kriteria
+            session()->flash('success', 'Berhasil menambahkan data kriteria!');
+            return redirect('admin/kriteriadaftar');
+        }
+    }
+
+
+    public function kriteriaedit($kode_kriteria)
+    {
+        $kriteria = DB::table('kriteria')->where('kode_kriteria', $kode_kriteria)->first();
+        $data = [
+            'title' => 'Edit kriteria',
+            'kriteria' => $kriteria,
+        ];
+        return view('admin.kriteriaedit', $data);
+    }
+
+    public function kriteriaeditsimpan(Request $request, $kode_kriteria)
+    {
+        $kode = $request->input('kode');
+        $nama = $request->input('nama');
+        $atribut = $request->input('atribut');
+
+
+        $simpan = [
+            'kode_kriteria' => $kode,
+            'nama_kriteria' => $nama,
+            'atribut' => $atribut,
+        ];
+
+
+        DB::table('kriteria')->where('kode_kriteria', $kode_kriteria)->update($simpan);
+
+        session()->flash('success', 'Berhasil mengubah data!');
+        return redirect('admin/kriteriadaftar');
+    }
+
+    public function kriteriahapus($kode_kriteria)
+    {
+        DB::table('kriteria')->where('kode_kriteria', $kode_kriteria)->delete();
+
+        DB::table('rel_kriteria')
+            ->where('ID1', $kode_kriteria)
+            ->orWhere('ID2', $kode_kriteria)
+            ->delete();
+
+        DB::table('rel_alternatif')->where('kode_kriteria', $kode_kriteria)->delete();
+
+        session()->flash('success', 'Berhasil menghapus data!');
+        return redirect('admin/kriteriadaftar');
+    }
+
+    public function kriteriabobot(Request $request)
+    {
+        $kriteria = DB::table('kriteria')->get();
+        $nilaiOptions = [
+            '1' => 'Sama penting dengan',
+            '2' => 'Mendekati sedikit lebih penting dari',
+            '3' => 'Sedikit lebih penting dari',
+            '4' => 'Mendekati lebih penting dari',
+            '5' => 'Lebih penting dari',
+            '6' => 'Mendekati sangat penting dari',
+            '7' => 'Sangat penting dari',
+            '8' => 'Mendekati mutlak dari',
+            '9' => 'Mutlak sangat penting dari',
+        ];
+
+        $rows = DB::table('rel_kriteria as rk')
+            ->join('kriteria as k', 'k.kode_kriteria', '=', 'rk.ID1')
+            ->select('k.nama_kriteria', 'rk.ID1', 'rk.ID2', 'rk.nilai')
+            ->orderBy('rk.ID1')
+            ->orderBy('rk.ID2')
             ->get();
 
-        $data = [
-            'title' => 'Daftar Penilaian Kinerja',
-            'penilaian' => $penilaian,
-        ];
+        $criterias = [];
+        $data = [];
 
-        return view('admin.penilaiandaftar', $data);
-    }
-    public function penilaiantambah()
-    {
-        $pegawai = DB::table('pegawai')->get();
-
-        $data = [
-            'title' => 'Tambah Penilaian',
-            'pegawai' => $pegawai,
-
-        ];
-        return view('admin.penilaiantambah', $data);
-    }
-
-    public function penilaiantambahsimpan(Request $request)
-    {
-        $data = [
-            'idpegawai' => $request->input('idpegawai'),
-            'kompetensi_teknis' => $request->input('kompetensi_teknis'),
-            'kompetensi_soft_skill' => $request->input('kompetensi_soft_skill'),
-            'kehadiran' => $request->input('kehadiran'),
-            'produktivitas' => $request->input('produktivitas'),
-            'inisiatif_kreativitas' => $request->input('inisiatif_kreativitas'),
-        ];
-
-        DB::table('penilaian_kinerja')->insert($data);
-
-        session()->flash('success', 'Penilaian kinerja berhasil ditambahkan!');
-        return redirect('admin/penilaiandaftar');
-    }
-
-    public function penilaianedit($id)
-    {
-        $penilaian = DB::table('penilaian_kinerja')->where('id', $id)->first();
-        $pegawai = DB::table('pegawai')->get();
-
-        if (!$penilaian) {
-            return redirect('admin/penilaiandaftar')->with('error', 'Data penilaian tidak ditemukan.');
+        foreach ($rows as $row) {
+            $criterias[$row->ID1] = $row->nama_kriteria;
+            $data[$row->ID1][$row->ID2] = $row->nilai;
         }
 
         $data = [
-            'title' => 'Edit Penilaian Kinerja Pegawai',
-            'pegawai' => $pegawai,
-            'penilaian' => $penilaian,
-        ];
-
-        return view('admin.penilaianedit', $data);
-    }
-
-    public function penilaianeditSimpan(Request $request, $id)
-    {
-        $data = [
-            'idpegawai' => $request->input('idpegawai'),
-            'kompetensi_teknis' => $request->input('kompetensi_teknis'),
-            'kompetensi_soft_skill' => $request->input('kompetensi_soft_skill'),
-            'kehadiran' => $request->input('kehadiran'),
-            'produktivitas' => $request->input('produktivitas'),
-            'inisiatif_kreativitas' => $request->input('inisiatif_kreativitas'),
-        ];
-
-        DB::table('penilaian_kinerja')->where('id', $id)->update($data);
-
-        session()->flash('success', 'Penilaian kinerja berhasil diperbarui!');
-        return redirect('admin/penilaiandaftar');
-    }
-
-    public function penilaianhapus($id)
-    {
-        DB::table('penilaian_kinerja')->where('id', $id)->delete();
-
-        session()->flash('success', 'Penilaian kinerja berhasil dihapus!');
-        return redirect('admin/penilaiandaftar');
-    }
-
-    public function prediksi(Request $request)
-    {
-        $data = DB::table('penilaian_kinerja')->get();
-        // Prepare features and targets
-        $features = [];
-        $targets = [];
-        foreach ($data as $row) {
-            $features[] = [
-                $row->kompetensi_teknis,
-                $row->kompetensi_soft_skill,
-                $row->kehadiran,
-                $row->produktivitas,
-                $row->inisiatif_kreativitas,
-            ];
-            $targets[] = $row->tingkat_mutu_karyawan; // Existing target
-        }
-
-        // Split the data into training and testing sets (80% training, 20% testing)
-        $splitRatio = 0.8;
-        $splitIndex = (int) (count($features) * $splitRatio);
-
-        $trainFeatures = array_slice($features, 0, $splitIndex);
-        $trainTargets = array_slice($targets, 0, $splitIndex);
-        $testFeatures = array_slice($features, $splitIndex);
-        $testTargets = array_slice($targets, $splitIndex);
-
-        // Create and train Random Forest
-        $rf = new RandomForest(10); // Instantiate with 10 trees
-        $rf->train($trainFeatures, $trainTargets);
-
-        // Make predictions on the test set
-        $predictions = [];
-        foreach ($testFeatures as $feature) {
-            $predictions[] = $rf->predict($feature);
-        }
-
-        // Evaluate model performance
-        $accuracy = $this->calculateAccuracy($predictions, $testTargets);
-
-        // Pass predictions and accuracy to the view
-        return view('admin.prediksi', [
-            'predictions' => $predictions,
+            'title' => 'Nilai Bobot Kriteria',
+            'kriteria' => $kriteria,
+            'nilaiOptions' => $nilaiOptions,
+            'criterias' => $criterias,
             'data' => $data,
-            'accuracy' => $accuracy,
-        ]);
+        ];
+
+        return view('admin.kriteriabobot', $data);
     }
 
-    private function calculateAccuracy($predictions, $actual)
+    public function updateKriteriaNilai(Request $request)
     {
-        $correct = 0;
-        foreach ($predictions as $index => $prediction) {
-            if ($prediction === $actual[$index]) {
-                $correct++;
-            }
+        $ID1 = $request->input('ID1');
+        $ID2 = $request->input('ID2');
+        $nilai = abs($request->input('nilai'));
+
+        if ($ID1 == $ID2 && $nilai != 1) {
+            session()->flash('error', 'Kriteria yang sama harus bernilai 1.');
+            return redirect()->back();
+        } else {
+            DB::table('rel_kriteria')
+                ->where('ID1', $ID1)
+                ->where('ID2', $ID2)
+                ->update(['nilai' => $nilai]);
+
+            DB::table('rel_kriteria')
+                ->where('ID1', $ID2)
+                ->where('ID2', $ID1)
+                ->update(['nilai' => 1 / $nilai]);
+
+            session()->flash('success', 'Nilai kriteria berhasil diubah.');
+            return redirect()->back();
         }
-        return $correct / count($actual) * 100; // Return accuracy as a percentage
     }
-    public function trainAndSaveModel()
+
+
+    public function alternatifbobot(Request $request)
     {
-        // Ambil data dari tabel penilaian_kinerja
-        $data = DB::table('penilaian_kinerja')->get();
+        $heads = DB::table('kriteria')->count();
 
-        if ($data->isEmpty()) {
-            return redirect()->back()->with('error', 'Data penilaian kosong. Tidak bisa melatih model.');
+        $alternatif = DB::table('pegawai')->orderBy('nip', 'ASC')->get();
+
+        $rows = DB::table('pegawai as a')
+            ->join('rel_alternatif as ra', 'a.nip', '=', 'ra.kode_alternatif')
+            ->join('kriteria as k', 'k.kode_kriteria', '=', 'ra.kode_kriteria')
+            ->select('a.nip', 'k.kode_kriteria', 'ra.nilai')
+            ->orderBy('a.nip')
+            ->orderBy('k.kode_kriteria')
+            ->get();
+
+        $data = [];
+        foreach ($rows as $row) {
+            $data[$row->nip][$row->kode_kriteria] = $row->nilai;
         }
 
-        // Siapkan fitur (X) dan label (y)
-        $samples = [];
-        $labels = [];
-        foreach ($data as $item) {
-            $samples[] = [
-                $item->kompetensi_teknis,
-                $item->kompetensi_soft_skill,
-                $item->kehadiran,
-                $item->produktivitas,
-                $item->inisiatif_kreativitas,
-            ];
-            $labels[] = $item->tingkat_mutu_karyawan;
+        $data = [
+            'title' => 'Nilai Bobot Alternatif',
+            'heads' => $heads,
+            'data' => $data,
+            'alternatif' => $alternatif,
+        ];
+
+        return view('admin.alternatifbobot', $data);
+    }
+
+    public function alternatifbobotedit($id)
+    {
+
+        $alternatif = DB::table('pegawai')->where('nip', $id)->first();
+
+        $rows = DB::table('rel_alternatif as ra')
+            ->join('kriteria as k', 'k.kode_kriteria', '=', 'ra.kode_kriteria')
+            ->select('ra.ID', 'k.kode_kriteria', 'k.nama_kriteria', 'ra.nilai')
+            ->where('kode_alternatif', $id)
+            ->orderBy('k.kode_kriteria')
+            ->get();
+
+
+        $data = [
+            'title' => 'Edit Nilai Bobot Alternatif',
+            'rows' => $rows,
+            'alternatif' => $alternatif,
+        ];
+
+        return view('admin.alternatifbobotedit', $data);
+    }
+
+    public function alternatifboboteditsimpan(Request $request, $id)
+    {
+        // Mendapatkan semua input dari form
+        $inputs = $request->except('_token'); // Mengabaikan token CSRF
+
+        // Iterasi melalui input yang diterima
+        foreach ($inputs as $key => $value) {
+            // Menghapus prefix 'ID-' untuk mendapatkan ID asli
+            $ID = str_replace('ID-', '', $key);
+
+            // Memperbarui nilai bobot dalam tabel 'rel_alternatif'
+            DB::table('rel_alternatif')
+                ->where('ID', $ID)
+                ->update(['nilai' => $value]);
         }
 
-        // Latih model Random Forest dengan parameter yang sesuai
-        $classifier = new RandomForest(
-            2,   // $numTrees: Jumlah pohon dalam hutan
-            1,  // $maxDepth: Tidak membatasi kedalaman pohon
-            2,     // $minSamplesSplit: Minimal sampel untuk split
-            1   // $maxFeatures: Gunakan semua fitur
+        // Menampilkan pesan sukses
+        session()->flash('success', 'Nilai bobot alternatif berhasil diubah.');
+
+        // Mengarahkan kembali ke halaman daftar alternatif
+        return redirect('admin/alternatifbobot');
+    }
+
+
+    public function perhitungan()
+    {
+
+        $nRI = array(
+            1 => 0,
+            2 => 0,
+            3 => 0.58,
+            4 => 0.9,
+            5 => 1.12,
+            6 => 1.24,
+            7 => 1.32,
+            8 => 1.41,
+            9 => 1.46,
+            10 => 1.49,
+            11 => 1.51,
+            12 => 1.48,
+            13 => 1.56,
+            14 => 1.57,
+            15 => 1.59
         );
 
-        $classifier->train($samples, $labels);
+        $matriks = $this->AHP_get_relkriteria();
+        $total = $this->AHP_get_total_kolom($matriks);
+        $normal = $this->AHP_normalize($matriks, $total);
+        $rata = $this->AHP_get_rata($normal);
+        $cm = $this->AHP_consistency_measure($matriks, $rata);
 
-        // Serialisasi model menjadi string menggunakan ModelManager
-        $modelManager = new ModelManager();
-
-        // Menyimpan model ke dalam memori dengan path sementara
-        $path = storage_path('app/models/' . uniqid('model_') . '.mdl');
-        $modelManager->saveToFile($classifier, $path);
-
-        // Membaca model dari file dan mengencode-nya ke base64
-        $modelData = base64_encode(file_get_contents($path));
-
-        // Simpan model ke tabel random_forest_models
-        DB::table('random_forest_models')->insert([
-            'model_name' => 'Penilaian Kinerja Model',
-            'model_data' => $modelData,
-            'created_at' => now(),
-        ]);
-
-        // Hapus file model sementara setelah disimpan di database
-        unlink($path);
-
-        // Ambil data model terbaru untuk ditampilkan di view
-        $models = DB::table('random_forest_models')->orderBy('created_at', 'desc')->get();
-
-        // Kirim data ke view
         $data = [
-            'title' => 'Daftar Penilaian Kinerja',
-            'models' => $models,
+            'title' => 'Perhitungan',
+            'matriks' => $matriks,
+            'total' => $total,
+            'normal' => $normal,
+            'rata' => $rata,
+            'cm' => $cm,
+            'nRI' => $nRI,
         ];
-
-        // Tampilkan view dengan data model
-        return view('admin.train', $data)->with('success', 'Model berhasil dilatih dan disimpan ke database.');
+        return view('admin.perhitungan', $data);
     }
 
-    public function predictKinerja($idpegawai)
+
+
+    public function AHP_get_relkriteria()
     {
-        // Ambil data penilaian kinerja berdasarkan idpegawai
-        $penilaian = DB::table('penilaian_kinerja')
-            ->where('idpegawai', $idpegawai)
-            ->first();
+        $rows = DB::table('rel_kriteria as rk')
+            ->join('kriteria as k', 'k.kode_kriteria', '=', 'rk.ID1')
+            ->select('k.nama_kriteria', 'rk.ID1', 'rk.ID2', 'rk.nilai')
+            ->orderBy('ID1')
+            ->orderBy('ID2')
+            ->get();
 
-        if (!$penilaian) {
-            return redirect()->back()->with('error', 'Data penilaian tidak ditemukan.');
+        $data = [];
+        foreach ($rows as $row) {
+            $data[$row->ID1][$row->ID2] = $row->nilai;
         }
+        return $data;
+    }
 
-        // Siapkan data untuk prediksi
-        $sample = [
-            $penilaian->kompetensi_teknis,
-            $penilaian->kompetensi_soft_skill,
-            $penilaian->kehadiran,
-            $penilaian->produktivitas,
-            $penilaian->inisiatif_kreativitas,
-        ];
+    public function AHP_get_total_kolom($matriks)
+    {
+        $total = [];
+        foreach ($matriks as $key => $value) {
+            foreach ($value as $k => $v) {
+                $total[$k] = isset($total[$k]) ? ($total[$k] + $v) : $v;
+            }
+        }
+        return $total;
+    }
 
-        // Validasi data sample
-        foreach ($sample as $value) {
-            if (is_null($value) || !is_numeric($value)) {
-                return redirect()->back()->with('error', 'Data penilaian tidak valid.');
+    public function AHP_normalize($matriks, $total)
+    {
+        foreach ($matriks as $key => $value) {
+            foreach ($value as $k => $v) {
+                $matriks[$key][$k] = $matriks[$key][$k] / $total[$k];
+            }
+        }
+        return $matriks;
+    }
+
+    public function AHP_get_rata($normal)
+    {
+        $rata = [];
+        foreach ($normal as $key => $value) {
+            $rata[$key] = array_sum($value) / count($value);
+        }
+        return $rata;
+    }
+    public function AHP_consistency_measure($matriks, $rata)
+    {
+        $cm = [];
+        $matriks = $this->AHP_mmult($matriks, $rata);
+        foreach ($matriks as $key => $value) {
+            $cm[$key] = $value / $rata[$key];
+        }
+        return $cm;
+    }
+
+    public function AHP_mmult($matriks = array(), $rata = array())
+    {
+        $data = array();
+
+        $rata = array_values($rata);
+
+        foreach ($matriks as $key => $value) {
+            $no = 0;
+            foreach ($value as $k => $v) {
+                $data[$key] = isset($data[$key]) ? ($data[$key] + ($v * $rata[$no])) : $v * $rata[$no];
+                $no++;
             }
         }
 
-        // Muat model dari database
-        $modelRow = DB::table('random_forest_models')
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        if (!$modelRow) {
-            return redirect()->back()->with('error', 'Model belum dilatih.');
-        }
-
-        // Decode base64 model data
-        $modelData = base64_decode($modelRow->model_data);
-        $modelManager = new ModelManager();
-
-        // Simpan sementara file model untuk pemuatan
-        $tempPath = storage_path('app/models/' . uniqid('model_') . '.mdl');
-        file_put_contents($tempPath, $modelData);
-
-        // Periksa apakah file model berhasil disimpan
-        if (!file_exists($tempPath)) {
-            return redirect()->back()->with('error', 'File model tidak ditemukan.');
-        }
-
-        // Muat model dari file sementara
-        try {
-            $classifier = $modelManager->restoreFromFile($tempPath);
-        } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Model tidak dapat dimuat dengan benar.');
-        }
-
-        // Hapus file model sementara setelah digunakan
-        unlink($tempPath);
-
-        // Prediksi tingkat mutu karyawan
-        try {
-            $prediction = $classifier->predict($sample);
-        } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Prediksi gagal dilakukan.');
-        }
-
-        // Periksa hasil prediksi
-        if (is_null($prediction)) {
-            return redirect()->back()->with('error', 'Hasil prediksi tidak valid.');
-        }
-        // print_r($sample);
-        // die();
-        // Simpan hasil prediksi ke tabel penilaian_kinerja
-        $updateResult = DB::table('penilaian_kinerja')
-            ->where('idpegawai', $idpegawai)
-            ->update(['tingkat_mutu_karyawan' => 'jembut']);
-
-        if ($updateResult) {
-            return redirect('admin/pegawaidaftar')->with('success', 'Prediksi berhasil dilakukan. Tingkat mutu karyawan: ' . $prediction);
-        } else {
-            return redirect()->back()->with('error', 'Gagal menyimpan prediksi tingkat mutu karyawan.');
-        }
+        return $data;
     }
+
 }
