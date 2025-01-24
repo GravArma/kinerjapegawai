@@ -23,7 +23,7 @@
           <mxGeometry x="420" y="146" width="85" height="50" as="geometry" />
         </mxCell>
         <mxCell id="xj7CRVUtzKx-C04npIz_-4" value="mengelola Data Karyawan" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
-          <mxGeometry x="413" y="247" width="95" height="50" as="geometry" />
+          <mxGeometry x="412" y="248" width="95" height="50" as="geometry" />
         </mxCell>
         <mxCell id="xj7CRVUtzKx-C04npIz_-5" value="Ubah Password" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="413" y="365" width="95" height="50" as="geometry" />
